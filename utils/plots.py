@@ -18,8 +18,8 @@ import yaml
 from PIL import Image, ImageDraw, ImageFont
 from scipy.signal import butter, filtfilt
 
-from utils.general import xywh2xyxy, xyxy2xywh
-from utils.metrics import fitness
+from .general import xywh2xyxy, xyxy2xywh
+from .metrics import fitness
 
 # Settings
 matplotlib.rc('font', **{'size': 11})
@@ -444,7 +444,7 @@ def output_to_keypoint(output):
     return np.array(targets)
 
 
-def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
+def plot_skeleton_kpts(im, kpts, steps, keyPoints, orig_shape=None):
     #Plot the skeleton and keypointsfor coco datatset
     palette = np.array([[255, 128, 0], [255, 153, 51], [255, 178, 102],
                         [230, 230, 0], [255, 153, 255], [153, 204, 255],
@@ -463,6 +463,13 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
     radius = 5
     num_kpts = len(kpts) // steps
 
+    facexMin, facexMax, yMin = 10000, -1, 10000
+    facePoints = 0
+    objxMin, objyMin = (keyPoints[2]-keyPoints[4]/2), (keyPoints[3]-keyPoints[5]/2)
+    objxMax, objyMax = (keyPoints[2]+keyPoints[4]/2), (keyPoints[3]+keyPoints[5]/2)
+
+
+
     for kid in range(num_kpts):
         r, g, b = pose_kpt_color[kid]
         x_coord, y_coord = kpts[steps * kid], kpts[steps * kid + 1]
@@ -471,6 +478,15 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
                 conf = kpts[steps * kid + 2]
                 if conf < 0.5:
                     continue
+
+            if kid < 5:
+                facePoints += 1
+                if int(x_coord) < facexMin:
+                    facexMin = int(x_coord)
+                if int(x_coord) > facexMax:
+                    facexMax = int(x_coord)
+                if int(y_coord) < yMin:
+                    yMin = int(y_coord)
             cv2.circle(im, (int(x_coord), int(y_coord)), radius, (int(r), int(g), int(b)), -1)
 
     for sk_id, sk in enumerate(skeleton):
@@ -487,3 +503,10 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
         if pos2[0] % 640 == 0 or pos2[1] % 640 == 0 or pos2[0]<0 or pos2[1]<0:
             continue
         cv2.line(im, pos1, pos2, (int(r), int(g), int(b)), thickness=2)
+    
+    if facePoints > 1:
+        faceyMax = yMin + (yMin - objyMin)
+        cv2.rectangle(im, (int(facexMin) - 2, int(objyMin)), (int(facexMax), int(faceyMax)), color=(255, 0, 0), thickness=1,lineType=cv2.LINE_AA)
+        return [int(facexMin) - 2, int(objyMin), int(facexMax) - int(facexMin), int(faceyMax) - int(objyMin)]
+
+    return []
